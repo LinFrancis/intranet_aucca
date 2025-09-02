@@ -1203,7 +1203,7 @@ def render():
                                     <span style="border:1px solid #cfcfcf;border-radius:999px;
                                                 padding:2px 8px;margin-right:6px;"> {r.get('Usuario','—')}</span>
                                 </div>
-                                <div style="white-space:pre-wrap; line-height:0.3; color:#2E2A27;">
+                                <div style="white-space:pre-wrap; line-height:1; color:#2E2A27;">
                                     {(r.get('Observaciones') or '').replace('<','&lt;').replace('>','&gt;')}
                                 </div>
                             </div>

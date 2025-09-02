@@ -150,6 +150,7 @@ def _form_traspaso():
             row_out = [record.get(h,"") for h in headers]
             ws.append_row(row_out, value_input_option="USER_ENTERED")
             st.success(f"🔄 Traspaso {origen} → {destino} registrado")
+           
 
 def _form_registro(cats_existentes: list[str]):
     """Selector de tipo y despliegue del formulario correspondiente"""
@@ -161,7 +162,6 @@ def _form_registro(cats_existentes: list[str]):
     elif tipo_sel=="Traspaso":
         _form_traspaso()
 
-   
 
 def _form_editar_anular(df: pd.DataFrame):
     st.markdown("### ✏️ Editar / Anular movimiento")
@@ -305,6 +305,7 @@ def _form_editar_anular(df: pd.DataFrame):
         else:
             st.success(f"✅ Cambios guardados por {editor}.")
         st.rerun()
+       
 
 def _form_ingreso_gasto(tipo: str, cats_existentes: list[str]):
     """Formulario para registrar ingresos o gastos"""
@@ -463,5 +464,12 @@ def render():
         modo = st.radio("Selecciona modo", ["Registrar","Editar / Anular"], horizontal=True)
         if modo=="Registrar":
             _form_registro(cats_existentes)
+            if st.button("Agregar nuevo registro", key = "actualizardb2"):
+                st.cache_data.clear()
+                try: st.cache_resource.clear()
+                except: pass
+                st.success("Ya puede proceder ✅")
+                st.rerun()
         else:
             _form_editar_anular(df)
+          

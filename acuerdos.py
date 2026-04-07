@@ -20,7 +20,11 @@ ECO_CSS = """
 }
 
 /* Tipografía global - Aplicada selectivamente para no romper iconos */
-html, body, .main, .stMarkdown, p, span, div, label, li, .st-emotion-cache-16idsys p {
+html, body, .main, .stMarkdown, p, div, label, li, .st-emotion-cache-16idsys p {
+  font-family: 'Montserrat', sans-serif !important;
+}
+/* Aplicar Montserrat a spans, pero NO a los que son íconos */
+span:not([data-testid="stExpanderToggleIcon"]):not(.material-icons):not([class*="Icon"]) {
   font-family: 'Montserrat', sans-serif !important;
 }
 
@@ -84,10 +88,31 @@ h1, h2, h3, h4, h5, h6 {
   line-height: inherit !important;
 }
 
-/* Evitar que aparezca el nombre del icono como texto (ligaduras) */
-[data-testid="stExpander"] summary [data-testid="stIconMaterial"], 
-[data-testid="stExpander"] summary span {
-    font-family: 'Material Icons', 'Material Symbols Outlined' !important;
+/* Fix: ocultar texto fallback de íconos arrow en Streamlit Cloud */
+[data-testid="stExpander"] [data-testid="stExpanderToggleIcon"] {
+    font-size: 0 !important;
+    overflow: hidden !important;
+    width: 24px !important;
+    height: 24px !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+[data-testid="stExpander"] [data-testid="stExpanderToggleIcon"] svg {
+    font-size: initial !important;
+    width: 20px !important;
+    height: 20px !important;
+}
+/* Fallback: si no hay SVG, usar pseudo-elemento como flecha */
+[data-testid="stExpander"] details:not([open]) [data-testid="stExpanderToggleIcon"]::after {
+    content: "▶" !important;
+    font-size: 12px !important;
+    color: #7B4F9E;
+}
+[data-testid="stExpander"] details[open] [data-testid="stExpanderToggleIcon"]::after {
+    content: "▼" !important;
+    font-size: 12px !important;
+    color: #7B4F9E;
 }
 
 /* Formularios y Cajas de Inputs */

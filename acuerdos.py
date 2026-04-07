@@ -57,7 +57,25 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 12px !important;
   box-shadow: 0 4px 12px rgba(0,0,0,0.03);
   background-color: #FFFFFF !important;
-  overflow: hidden;
+  overflow: visible !important; /* Permitir que la flecha se vea correctamente */
+}
+
+/* Limpiar flechas extra y corregir alineación del expander */
+[data-testid="stExpander"] summary::before,
+[data-testid="stExpander"] summary p::before {
+  content: none !important;
+  display: none !important;
+}
+
+[data-testid="stExpander"] summary svg {
+  color: #7B4F9E !important;
+  transition: transform 0.2s ease;
+}
+
+[data-testid="stExpander"] summary p {
+  color: #7B4F9E !important;
+  font-weight: 600 !important;
+  margin: 0 !important;
 }
 
 /* Formularios y Cajas de Inputs */

@@ -19,9 +19,14 @@ ECO_CSS = """
   color-scheme: only light;
 }
 
-/* Tipografía global */
-html, body, [class*="css"], [class*="st-"], .stMarkdown {
+/* Tipografía global - Aplicada selectivamente para no romper iconos */
+html, body, .main, .stMarkdown, p, span, div, label, li, .st-emotion-cache-16idsys p {
   font-family: 'Montserrat', sans-serif !important;
+}
+
+/* Preservar iconos (Material Icons / Font Awesome / Streamlit Icons) */
+.material-icons, [class*="Icon"], [data-testid="stIconMaterial"], [data-testid="stExpander"] svg {
+  font-family: inherit !important; /* Permitir que hereden su propia fuente si está definida inline o por Streamlit */
 }
 
 /* Fondos */
@@ -76,10 +81,17 @@ h1, h2, h3, h4, h5, h6 {
   color: #7B4F9E !important;
   font-weight: 600 !important;
   margin: 0 !important;
+  line-height: inherit !important;
+}
+
+/* Evitar que aparezca el nombre del icono como texto (ligaduras) */
+[data-testid="stExpander"] summary [data-testid="stIconMaterial"], 
+[data-testid="stExpander"] summary span {
+    font-family: 'Material Icons', 'Material Symbols Outlined' !important;
 }
 
 /* Formularios y Cajas de Inputs */
-input, select, textarea {
+input, select, textarea, [data-baseweb="select"] {
   border-radius: 8px !important;
   background-color: #FFFFFF !important;
   border: 1px solid #CDB4FF !important;
@@ -88,6 +100,14 @@ input, select, textarea {
 input:focus, select:focus, textarea:focus {
   border-color: #B497E7 !important;
   box-shadow: 0 0 0 1px #B497E7 !important;
+}
+
+/* Arreglo específico para Multiselect (evitar borde izquierdo doble) */
+[data-testid="stMultiSelect"] > div {
+    border-left: 1px solid #CDB4FF !important;
+}
+[data-testid="stMultiSelect"] [data-baseweb="select"] > div {
+    border: none !important;
 }
 
 /* Botones Primary */

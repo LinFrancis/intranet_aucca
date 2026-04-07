@@ -358,7 +358,7 @@ def render():
     col1, col2 = st.columns(2)
     
     with col1:
-        st.markdown("## 📋 Checklist de semanerx")
+        st.markdown("## Semanerx")
     with col2:
         # -------------------------
         # Botón para borrar caché

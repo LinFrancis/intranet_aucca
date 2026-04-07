@@ -95,7 +95,7 @@ def _render_cards_grid(df):
             with col: _render_card(df.iloc[i + j])
 
 def render():
-    st.subheader("🔗 Links claves")
+    st.markdown("## Links claves")
     df = _normalize(cargar_datos("links"))
 
     c0, c1, c2, c3, c4 = st.columns([2, 2, 2, 2, 2])

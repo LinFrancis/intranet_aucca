@@ -6,67 +6,159 @@ import datetime as dt
 # ----------------------------
 # Config básica de la app
 # ----------------------------
-st.set_page_config(page_title="Acuerdos Aucca", layout="wide")
+st.set_page_config(page_title="Plataforma Aucca", layout="wide")
 
 # ----------------------------
-# Estilos (light-only + compact)
+# Estilos UI Premium (Montserrat + Clean Design)
 # ----------------------------
 ECO_CSS = """
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+
 :root {
-  color-scheme: only light; /* fuerza light */
-}
-html, body, [data-testid="stAppViewContainer"] > .main {
-  background-color: #FAF9F6 !important;
-  color: #3E4E2C !important;
-  font-family: "Georgia", serif;
-}
-[data-testid="stSidebar"] { background-color: #FAF9F6 !important; }
-
-/* Compacta paddings generales */
-.block-container { padding-top: 0.8rem !important; }
-
-/* Header sticky */
-.aucca-header {
-  position: sticky; top: 0; z-index: 998;
-  background: #FAF9F6;
-  border-bottom: 1px solid #e7e1d6;
-  margin: 0 -1rem 1rem -1rem; padding: 0.6rem 1rem;
-}
-.aucca-header .wrap {
-  display: flex; align-items: center; gap: 12px;
-}
-.aucca-header h1 {
-  font-size: 1.35rem; margin: 0; color: #2E2A27;
+  color-scheme: only light;
 }
 
-/* Títulos de sección con icono SVG pequeño */
-.section-title {
-  display: flex; align-items: center; gap: 8px; margin: 0.2rem 0 0.8rem;
+/* Tipografía global */
+html, body, [class*="css"], [class*="st-"], .stMarkdown {
+  font-family: 'Montserrat', sans-serif !important;
 }
-.section-title svg { width: 18px; height: 18px; display: inline-block; }
 
-/* Tarjetas KPI genéricas */
-.kpi-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 6px 0 16px; }
-.kpi { background: #F7F3E9; border: 1px solid #E7DDC6; border-radius: 14px; padding: 10px 12px; }
-.kpi .label { font-size: 0.9rem; color: #6B6B6B; }
-.kpi .value { font-size: 1.4rem; font-weight: 700; color: #2E2A27; }
+/* Fondos */
+[data-testid="stAppViewContainer"] > .main {
+  background-color: #F3ECFF !important;
+}
+[data-testid="stSidebar"] {
+  background-color: #E6D9FF !important;
+}
 
-/* Tabs sin emojis (ya vienen del label) */
-[data-baseweb="tab"] { font-weight: 500; }
+/* Encabezados y tipografía */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 600 !important;
+  color: #7B4F9E !important;
+  letter-spacing: -0.02em;
+}
 
-/* En móviles, compactar más */
-@media (max-width: 640px) {
-  .kpi-row { grid-template-columns: 1fr 1fr; }
+/* Tabs UI */
+[data-baseweb="tab"] p {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 600;
+  font-size: 1rem;
+  letter-spacing: 0.01em;
+}
+[data-baseweb="tab-highlight"] {
+  background-color: #9D7FEA !important;
+}
+
+/* Estilo de Tarjetas Expandibles y Contenedores */
+[data-testid="stExpander"] {
+  border: 1px solid #E6D9FF !important;
+  border-radius: 12px !important;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+  background-color: #FFFFFF !important;
+  overflow: hidden;
+}
+
+/* Formularios y Cajas de Inputs */
+input, select, textarea {
+  border-radius: 8px !important;
+  background-color: #FFFFFF !important;
+  border: 1px solid #CDB4FF !important;
+  transition: all 0.2s ease-in-out;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: #B497E7 !important;
+  box-shadow: 0 0 0 1px #B497E7 !important;
+}
+
+/* Botones Primary */
+[data-testid="baseButton-primary"] {
+  background-color: #B497E7 !important;
+  color: #FFFFFF !important;
+  border-radius: 8px !important;
+  border: none !important;
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 600 !important;
+  padding: 0.5rem 1rem !important;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 6px rgba(180, 151, 231, 0.2) !important;
+}
+[data-testid="baseButton-primary"]:hover {
+  background-color: #9D7FEA !important;
+  box-shadow: 0 6px 10px rgba(157, 127, 234, 0.3) !important;
+  transform: translateY(-1px);
+}
+
+/* Botones Secundarios */
+[data-testid="baseButton-secondary"] {
+  border-radius: 8px !important;
+  border: 1px solid #CDB4FF !important;
+  background-color: #FFFFFF !important;
+  font-weight: 600 !important;
+  font-family: 'Montserrat', sans-serif !important;
+  color: #7B4F9E !important;
+  transition: all 0.2s ease;
+}
+[data-testid="baseButton-secondary"]:hover {
+  border-color: #9D7FEA !important;
+  background-color: #F3ECFF !important;
+}
+
+/* Tablas Dataframe */
+[data-testid="stDataFrame"] {
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+  border: 1px solid #CDB4FF;
+}
+
+/* Diseño Banner principal */
+.aucca-banner {
+    display: flex;
+    align-items: center;
+    gap: 1.5rem;
+    margin-top: 1rem;
+    margin-bottom: 2.5rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, #FFFFFF 0%, #F3ECFF 100%);
+    border-radius: 16px;
+    box-shadow: 0 4px 16px rgba(123, 79, 158, 0.06);
+    border: 1px solid #E6D9FF;
+}
+.aucca-banner img {
+    width: 75px;
+    height: 75px;
+    border-radius: 50%;
+    object-fit: cover;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    border: 3px solid #FFFFFF;
+}
+.aucca-banner h1 {
+    font-size: 2.2rem !important;
+    font-weight: 700 !important;
+    margin: 0 !important;
+    color: #7B4F9E !important;
+    letter-spacing: -0.03em !important;
+}
+
+/* Detalles menores y layout */
+hr { border-color: #E6D9FF !important; }
+.block-container { padding-top: 2rem !important; max-width: 1200px; }
+
+/* Métricas en Finanzas */
+[data-testid="stMetricValue"] {
+  font-family: 'Montserrat', sans-serif !important;
+  font-weight: 700 !important;
+  color: #7B4F9E !important;
 }
 </style>
 """
 st.markdown(ECO_CSS, unsafe_allow_html=True)
 
 # ----------------------------
-# Header sticky
+# Header sticky / Banner Logo
 # ----------------------------
-
 import base64
 
 def load_logo(path):
@@ -78,29 +170,9 @@ logo_base64 = load_logo("images/logo_aucca.png")
 
 st.markdown(
     f"""
-    <style>
-    .aucca-banner {{
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        margin-top: 2rem;
-    }}
-    .aucca-banner img {{
-        width: 70px;
-        height: 70px;
-        border-radius: 50%;
-        object-fit: cover;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.2);
-    }}
-    .aucca-banner h1 {{
-        font-size: 2rem;
-        font-weight: 700;
-        margin: 0;
-    }}
-    </style>
     <div class="aucca-banner">
         <img src="data:image/png;base64,{logo_base64}" alt="AUCCA logo">
-        <h1>Acuerdos</h1>
+        <h1>Plataforma Gestión Interna</h1>
     </div>
     """,
     unsafe_allow_html=True,
@@ -119,11 +191,11 @@ st.markdown(
 # Definición de secciones (orden y slugs para deep link)
 # ----------------------------
 SECTIONS = [
-    {"slug": "internos",  "label": "Acuerdos de convivencia (internos)"},
-    {"slug": "externos",  "label": "Acuerdos Comunicación Externa"},
-    {"slug": "checklist", "label": "Checklist de semanerx"},
+    {"slug": "bienvenida", "label": "Bienvenida"},
+    {"slug": "checklist", "label": "Semanerx"},
     {"slug": "finanzas",  "label": "Finanzas"},
     {"slug": "links",     "label": "Links claves"},
+    {"slug": "acuerdos",  "label": "Acuerdos"},
 ]
 
 # ----------------------------
@@ -155,9 +227,9 @@ tabs = st.tabs([s["label"] for s in SECTIONS])
 # Inline SVG íconos por sección (no emojis)
 # ----------------------------
 ICONS = {
+    "bienvenida": """<svg viewBox="0 0 24 24" fill="none"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" stroke="#3E4E2C" stroke-width="2"/><polyline points="9 22 9 12 15 12 15 22" stroke="#3E4E2C" stroke-width="2"/></svg>""",
     "checklist": """<svg viewBox="0 0 24 24" fill="none"><path d="M9 11l3 3L22 4" stroke="#3E4E2C" stroke-width="2" fill="none"/><rect x="2" y="7" width="12" height="12" rx="2" stroke="#3E4E2C" stroke-width="2"/></svg>""",
-    "internos":  """<svg viewBox="0 0 24 24" fill="none"><path d="M3 10l9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9z" stroke="#3E4E2C" stroke-width="2"/></svg>""",
-    "externos":  """<svg viewBox="0 0 24 24" fill="none"><path d="M4 4h16v6H4zM4 14h10m-6 4h6" stroke="#3E4E2C" stroke-width="2"/></svg>""",
+    "acuerdos":  """<svg viewBox="0 0 24 24" fill="none"><path d="M3 10l9-7 9 7v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9z" stroke="#3E4E2C" stroke-width="2"/></svg>""",
     "links":     """<svg viewBox="0 0 24 24" fill="none"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 1 0-7-7l-1 1m4 6-1 1a5 5 0 1 1-7-7l2-2" stroke="#3E4E2C" stroke-width="2"/></svg>""",
     "finanzas":  """<svg viewBox="0 0 24 24" fill="none"><circle cx="8" cy="8" r="3" stroke="#3E4E2C" stroke-width="2"/><path d="M3 21a9 9 0 0 1 18 0" stroke="#3E4E2C" stroke-width="2"/></svg>""",
 }
@@ -167,28 +239,35 @@ ICONS = {
 # ----------------------------
 def _safe_render(section_slug: str):
     try:
-        if section_slug == "checklist":
+        if section_slug == "bienvenida":
+            try:
+                from secciones.bienvenida import render as render_bienvenida
+                render_bienvenida()
+            except Exception:
+                st.info("Módulo bienvenida no disponible.")
+                
+        elif section_slug == "checklist":
             from secciones.checklist import render as render_checklist
             #st.markdown(f'<div class="section-title">{ICONS["checklist"]}<h3>Checklist de semanerx</h3></div>', unsafe_allow_html=True)
             render_checklist()
 
-        elif section_slug == "internos":
-            try:
-                from secciones.acuerdos_internos import render as render_internos
-            except Exception:
-                st.info("Esta sección aún no está modularizada como `secciones/acuerdos_internos.py` con una función `render()`.")
-                return
-            #st.markdown(f'<div class="section-title">{ICONS["internos"]}<h3>Acuerdos de convivencia (internos)</h3></div>', unsafe_allow_html=True)
-            render_internos()
-
-        elif section_slug == "externos":
-            try:
-                from secciones.acuerdos_externos import render as render_externos
-            except Exception:
-                st.info("Esta sección aún no está modularizada como `secciones/acuerdos_externos.py` con una función `render()`.")
-                return
-            #st.markdown(f'<div class="section-title">{ICONS["externos"]}<h3>Acuerdos Comunicación Externa</h3></div>', unsafe_allow_html=True)
-            render_externos()
+        elif section_slug == "acuerdos":
+            st.markdown("### Repositorio de Acuerdos")
+            tab_int, tab_ext = st.tabs(["Acuerdos Internos", "Acuerdos Externos"])
+            with tab_int:
+                try:
+                    from secciones.acuerdos_internos import render as render_internos
+                except Exception:
+                    st.info("Sección de acuerdos internos no disponible.")
+                    render_internos = lambda: None
+                render_internos()
+            with tab_ext:
+                try:
+                    from secciones.acuerdos_externos import render as render_externos
+                except Exception:
+                    st.info("Sección de acuerdos externos no disponible.")
+                    render_externos = lambda: None
+                render_externos()
 
         elif section_slug == "links":
             try:

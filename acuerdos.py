@@ -14,23 +14,62 @@ st.set_page_config(page_title="Plataforma Aucca", layout="wide")
 ECO_CSS = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
 
 :root {
   color-scheme: only light;
 }
 
-/* Tipografía global - Aplicada selectivamente para no romper iconos */
-html, body, .main, .stMarkdown, p, div, label, li, .st-emotion-cache-16idsys p {
-  font-family: 'Montserrat', sans-serif !important;
-}
-/* Aplicar Montserrat a spans, pero NO a los que son íconos */
-span:not([data-testid="stExpanderToggleIcon"]):not(.material-icons):not([class*="Icon"]) {
+/* Tipografía global */
+html, body, .main, .stMarkdown, p, div, span, label, li {
   font-family: 'Montserrat', sans-serif !important;
 }
 
-/* Preservar iconos (Material Icons / Font Awesome / Streamlit Icons) */
-.material-icons, [class*="Icon"], [data-testid="stIconMaterial"], [data-testid="stExpander"] svg {
-  font-family: inherit !important; /* Permitir que hereden su propia fuente si está definida inline o por Streamlit */
+/* Safety net: ocultar CUALQUIER texto de Material Icons que Streamlit renderice como fallback */
+[data-testid="stIconMaterial"],
+[data-testid="stExpanderToggleIcon"],
+[data-testid="stExpander"] summary [class*="icon"],
+[data-testid="stExpander"] summary [class*="Icon"] {
+  font-size: 0 !important;
+  overflow: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+/* Catch-all: cualquier span dentro de summary que contenga texto de icono Material */
+[data-testid="stExpander"] summary > span:not([data-testid="stMarkdownContainer"]) {
+  font-size: 0 !important;
+  line-height: 0 !important;
+  overflow: hidden !important;
+  max-width: 0 !important;
+  display: none !important;
+}
+
+/* NUCLEAR FIX: ocultar el ícono toggle del expander y reemplazar con CSS puro */
+[data-testid="stExpander"] summary > span:first-child {
+  font-size: 0 !important;
+  line-height: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  display: none !important;
+}
+[data-testid="stExpander"] details > summary {
+  display: flex !important;
+  align-items: center !important;
+  gap: 0.5rem !important;
+}
+[data-testid="stExpander"] details > summary::before {
+  content: "▸" !important;
+  font-size: 1.2rem !important;
+  color: #7B4F9E !important;
+  display: inline-block !important;
+  transition: transform 0.2s ease !important;
+  flex-shrink: 0 !important;
+}
+[data-testid="stExpander"] details[open] > summary::before {
+  content: "▾" !important;
 }
 
 /* Fondos */
@@ -66,53 +105,12 @@ h1, h2, h3, h4, h5, h6 {
   border-radius: 12px !important;
   box-shadow: 0 4px 12px rgba(0,0,0,0.03);
   background-color: #FFFFFF !important;
-  overflow: visible !important; /* Permitir que la flecha se vea correctamente */
-}
-
-/* Limpiar flechas extra y corregir alineación del expander */
-[data-testid="stExpander"] summary::before,
-[data-testid="stExpander"] summary p::before {
-  content: none !important;
-  display: none !important;
-}
-
-[data-testid="stExpander"] summary svg {
-  color: #7B4F9E !important;
-  transition: transform 0.2s ease;
 }
 
 [data-testid="stExpander"] summary p {
   color: #7B4F9E !important;
   font-weight: 600 !important;
   margin: 0 !important;
-  line-height: inherit !important;
-}
-
-/* Fix: ocultar texto fallback de íconos arrow en Streamlit Cloud */
-[data-testid="stExpander"] [data-testid="stExpanderToggleIcon"] {
-    font-size: 0 !important;
-    overflow: hidden !important;
-    width: 24px !important;
-    height: 24px !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-}
-[data-testid="stExpander"] [data-testid="stExpanderToggleIcon"] svg {
-    font-size: initial !important;
-    width: 20px !important;
-    height: 20px !important;
-}
-/* Fallback: si no hay SVG, usar pseudo-elemento como flecha */
-[data-testid="stExpander"] details:not([open]) [data-testid="stExpanderToggleIcon"]::after {
-    content: "▶" !important;
-    font-size: 12px !important;
-    color: #7B4F9E;
-}
-[data-testid="stExpander"] details[open] [data-testid="stExpanderToggleIcon"]::after {
-    content: "▼" !important;
-    font-size: 12px !important;
-    color: #7B4F9E;
 }
 
 /* Formularios y Cajas de Inputs */

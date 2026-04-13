@@ -37,40 +37,7 @@ html, body, .main, .stMarkdown, p, div, span, label, li {
   display: none !important;
 }
 
-/* Catch-all: cualquier span dentro de summary que contenga texto de icono Material */
-[data-testid="stExpander"] summary > span:not([data-testid="stMarkdownContainer"]) {
-  font-size: 0 !important;
-  line-height: 0 !important;
-  overflow: hidden !important;
-  max-width: 0 !important;
-  display: none !important;
-}
 
-/* NUCLEAR FIX: ocultar el ícono toggle del expander y reemplazar con CSS puro */
-[data-testid="stExpander"] summary > span:first-child {
-  font-size: 0 !important;
-  line-height: 0 !important;
-  width: 0 !important;
-  height: 0 !important;
-  overflow: hidden !important;
-  display: none !important;
-}
-[data-testid="stExpander"] details > summary {
-  display: flex !important;
-  align-items: center !important;
-  gap: 0.5rem !important;
-}
-[data-testid="stExpander"] details > summary::before {
-  content: "▸" !important;
-  font-size: 1.2rem !important;
-  color: #7B4F9E !important;
-  display: inline-block !important;
-  transition: transform 0.2s ease !important;
-  flex-shrink: 0 !important;
-}
-[data-testid="stExpander"] details[open] > summary::before {
-  content: "▾" !important;
-}
 
 /* Fondos */
 [data-testid="stAppViewContainer"] > .main {
@@ -227,17 +194,6 @@ def load_logo(path):
         data = f.read()
     return base64.b64encode(data).decode("utf-8")
 
-logo_base64 = load_logo("images/logo_aucca.png")
-
-st.markdown(
-    f"""
-    <div class="aucca-banner">
-        <img src="data:image/png;base64,{logo_base64}" alt="AUCCA logo">
-        <h1>Plataforma Gestión Interna</h1>
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
 
 # col_logo, col_title = st.columns([1, 8])
 # with col_logo:
@@ -280,9 +236,74 @@ if section_q and any(s["slug"] == section_q for s in SECTIONS):
     SECTIONS = sorted(SECTIONS, key=lambda s: 0 if s["slug"] == section_q else 1)
 
 # ----------------------------
-# Tabs
+# Autenticación y Modos
 # ----------------------------
-tabs = st.tabs([s["label"] for s in SECTIONS])
+from secciones.finanzas_aucca import AUCCANES
+import re
+
+if "current_user" not in st.session_state:
+    st.session_state.current_user = None
+
+if "app_mode" not in st.session_state:
+    st.session_state.app_mode = "Modo Auccasa"
+
+def _clean_name(name):
+    return re.sub(r'[^\w\s]', '', name).strip().lower()
+
+auth_users_map = {_clean_name(u): u for u in AUCCANES}
+
+with st.sidebar:
+    logo_base64 = load_logo("images/logo_aucca.png")
+    st.markdown(
+        f"""
+        <div class="aucca-banner" style="margin-bottom: 2rem;">
+            <img src="data:image/png;base64,{logo_base64}" alt="AUCCA logo" style="width: 45px; height: 45px; border-width: 2px;">
+            <h1 style="font-size: 1.2rem !important; margin-top: 5px !important;">Intranet</h1>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if st.session_state.current_user is None:
+        st.markdown("### 🔐 Acceso Interno")
+        with st.form("login_form"):
+            login_user = st.text_input("Usuario (tu nombre)")
+            login_pass = st.text_input("Contraseña", type="password")
+            if st.form_submit_button("Ingresar", type="primary", use_container_width=True):
+                user_clean = _clean_name(login_user)
+                pass_clean = _clean_name(login_pass)
+                if user_clean and user_clean == pass_clean and user_clean in auth_users_map:
+                    st.session_state.current_user = auth_users_map[user_clean]
+                    st.rerun()
+                else:
+                    st.error("Credenciales incorrectas")
+    else:
+        st.markdown(f"### 👤 {st.session_state.current_user}")
+        if st.button("🚪 Cerrar Sesión", use_container_width=True):
+            st.session_state.current_user = None
+            st.rerun()
+        
+        st.markdown("---")
+        st.markdown("### ⚙️ Modo de Operación")
+        current_mode_idx = 1 if st.session_state.app_mode == "Modo Evento" else 0
+        mode = st.radio(
+            "Selecciona la vista a utilizar:",
+            ["Modo Auccasa", "Modo Evento"],
+            index=current_mode_idx,
+            label_visibility="collapsed"
+        )
+        if mode != st.session_state.app_mode:
+            st.session_state.app_mode = mode
+            st.rerun()
+
+if st.session_state.current_user is None:
+    st.info("👋 Por favor inicia sesión en la barra lateral izquierda para acceder a la plataforma.")
+    st.stop()
+
+# ----------------------------
+# Inicialización pospuesta de Tabs
+# ----------------------------
+# tabs = st.tabs(...) se llamará al final si corresponde
 
 # ----------------------------
 # Inline SVG íconos por sección (no emojis)
@@ -352,9 +373,20 @@ def _safe_render(section_slug: str):
         st.exception(e)
 
 # ----------------------------
-# Colocar contenido en cada tab (en el orden actual)
-# Nota: el deep link solo define la tab que aparece seleccionada al cargar.
+# Renderizado de Vista Principal
 # ----------------------------
-for tab, sec in zip(tabs, SECTIONS):
-    with tab:
-        _safe_render(sec["slug"])
+if st.session_state.app_mode == "Modo Evento":
+    try:
+        from secciones.gestion_eventos import render as render_eventos
+        render_eventos()
+    except Exception as e:
+        st.error("Error al cargar el módulo de eventos.")
+        st.exception(e)
+else:
+    # ----------------------------
+    # Tabs originales (Modo Auccasa)
+    # ----------------------------
+    tabs = st.tabs([s["label"] for s in SECTIONS])
+    for tab, sec in zip(tabs, SECTIONS):
+        with tab:
+            _safe_render(sec["slug"])

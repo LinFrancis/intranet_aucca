@@ -4,6 +4,7 @@ __pycache__/
 
 # Entorno virtual
 venv*/
+aucca2026/
 .env
 
 # Archivos temporales de VS Code

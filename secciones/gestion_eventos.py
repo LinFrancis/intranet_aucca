@@ -262,14 +262,14 @@ def render():
                     nuevo_p = col_n1.text_input("Nombre del Producto", key="new_p_name", label_visibility="collapsed", placeholder="Ej: Pizza Napolitana")
                     nuevo_v = col_n2.number_input("Precio Venta", min_value=0, step=100, key="new_p_val", label_visibility="collapsed")
                     if col_n3.form_submit_button("Añadir al Menú", use_container_width=True):
-                    if nuevo_p.strip():
-                        if nuevo_p.strip() not in price_map:
-                            _save_evt_row("evt_productos", {"EventID": seleccion, "Nombre": nuevo_p.strip(), "Precio_Base": str(int(nuevo_v)), "CreatedBy": usuario_actual})
-                            st.success("Producto creado.")
-                            _load_evt_df.clear()
-                            st.rerun()
-                        else:
-                            st.error("Este producto ya existe en el menú.")
+                        if nuevo_p.strip():
+                            if nuevo_p.strip() not in price_map:
+                                _save_evt_row("evt_productos", {"EventID": seleccion, "Nombre": nuevo_p.strip(), "Precio_Base": str(int(nuevo_v)), "CreatedBy": usuario_actual})
+                                st.success("Producto creado.")
+                                _load_evt_df.clear()
+                                st.rerun()
+                            else:
+                                st.error("Este producto ya existe en el menú.")
 
             st.markdown("##### ✏️ Editar Precios Existentes")
             if not df_prod_act.empty:
@@ -487,28 +487,28 @@ def render():
                                         st.form_submit_button("Confirmar Pago Bloqueado (Entregas Pendientes)", disabled=True)
                                     else:
                                         if st.form_submit_button(f"💸 Confirmar Pago {mesa}", type="primary"):
-                                        # Hay que actualizar filas a Pagadas y registrar Quien Cobra
-                                        import gspread
-                                        ws = _open_ws("evt_ventas")
-                                        records = ws.get_all_records()
-                                        cell_updates = []
-                                        estado_pago_idx = SHEETS_CONFIG["evt_ventas"].index("Estado_Pago") + 1
-                                        medio_pago_idx = SHEETS_CONFIG["evt_ventas"].index("Medio_Pago") + 1
-                                        persona_cobro_idx = SHEETS_CONFIG["evt_ventas"].index("Persona_Cobro") + 1
-                                        
-                                        # Buscar la mesa pendiente y actualizar.
-                                        for i, r_g in enumerate(records):
-                                            if str(r_g.get("EventID")) == seleccion and str(r_g.get("Mesa")) == mesa and str(r_g.get("Estado_Pago")) == "Pendiente":
-                                                row_excel = i + 2  # +1 por indexado en 0, +1 por headers
-                                                cell_updates.append(gspread.Cell(row=row_excel, col=estado_pago_idx, value="Pagado"))
-                                                cell_updates.append(gspread.Cell(row=row_excel, col=medio_pago_idx, value=medio_pago))
-                                                cell_updates.append(gspread.Cell(row=row_excel, col=persona_cobro_idx, value=quien_cobra))
-                                                
-                                        if cell_updates:
-                                            ws.update_cells(cell_updates)
-                                            st.success(f"Cuenta de {mesa} pagada por {medio_pago}")
-                                            _load_evt_df.clear()
-                                            st.rerun()
+                                            # Hay que actualizar filas a Pagadas y registrar Quien Cobra
+                                            import gspread
+                                            ws = _open_ws("evt_ventas")
+                                            records = ws.get_all_records()
+                                            cell_updates = []
+                                            estado_pago_idx = SHEETS_CONFIG["evt_ventas"].index("Estado_Pago") + 1
+                                            medio_pago_idx = SHEETS_CONFIG["evt_ventas"].index("Medio_Pago") + 1
+                                            persona_cobro_idx = SHEETS_CONFIG["evt_ventas"].index("Persona_Cobro") + 1
+                                            
+                                            # Buscar la mesa pendiente y actualizar.
+                                            for i, r_g in enumerate(records):
+                                                if str(r_g.get("EventID")) == seleccion and str(r_g.get("Mesa")) == mesa and str(r_g.get("Estado_Pago")) == "Pendiente":
+                                                    row_excel = i + 2  # +1 por indexado en 0, +1 por headers
+                                                    cell_updates.append(gspread.Cell(row=row_excel, col=estado_pago_idx, value="Pagado"))
+                                                    cell_updates.append(gspread.Cell(row=row_excel, col=medio_pago_idx, value=medio_pago))
+                                                    cell_updates.append(gspread.Cell(row=row_excel, col=persona_cobro_idx, value=quien_cobra))
+                                                    
+                                            if cell_updates:
+                                                ws.update_cells(cell_updates)
+                                                st.success(f"Cuenta de {mesa} pagada por {medio_pago}")
+                                                _load_evt_df.clear()
+                                                st.rerun()
 
         # Resumen general de estado
         if not df_ven_act.empty:

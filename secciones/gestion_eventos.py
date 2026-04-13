@@ -54,7 +54,7 @@ def _ensure_evt_sheet(sheet_name: str) -> list[str]:
         return new_headers
     return headers
 
-@st.cache_data(ttl=5)
+@st.cache_data(ttl=60)
 def _load_evt_df(sheet_name: str) -> pd.DataFrame:
     """Carga los datos de una hoja como dataframe."""
     try:
@@ -257,10 +257,11 @@ def render():
             # Crear producto
             with st.container(border=True):
                 st.markdown("##### ➕ Crear Nuevo Producto")
-                col_n1, col_n2, col_n3 = st.columns([2, 1, 1])
-                nuevo_p = col_n1.text_input("Nombre del Producto", key="new_p_name", label_visibility="collapsed", placeholder="Ej: Pizza Napolitana")
-                nuevo_v = col_n2.number_input("Precio Venta", min_value=0, step=100, key="new_p_val", label_visibility="collapsed")
-                if col_n3.button("Añadir al Menú", use_container_width=True):
+                with st.form("form_crear_producto", clear_on_submit=True):
+                    col_n1, col_n2, col_n3 = st.columns([2, 1, 1])
+                    nuevo_p = col_n1.text_input("Nombre del Producto", key="new_p_name", label_visibility="collapsed", placeholder="Ej: Pizza Napolitana")
+                    nuevo_v = col_n2.number_input("Precio Venta", min_value=0, step=100, key="new_p_val", label_visibility="collapsed")
+                    if col_n3.form_submit_button("Añadir al Menú", use_container_width=True):
                     if nuevo_p.strip():
                         if nuevo_p.strip() not in price_map:
                             _save_evt_row("evt_productos", {"EventID": seleccion, "Nombre": nuevo_p.strip(), "Precio_Base": str(int(nuevo_v)), "CreatedBy": usuario_actual})
@@ -350,43 +351,43 @@ def render():
                         mesas_existentes.insert(0, ult_mesa)
                         
                         
-                    if not mesas_existentes:
-                        st.info("No hay mesas abiertas. Escribe una nueva:")
-                        sel_mesa = st.text_input("Nombre Mesa")
-                    else:
-                        sel_mesa = st.selectbox("Seleccionar Cuenta/Mesa", mesas_existentes)
+                    with st.form("form_add_prod_cuenta", clear_on_submit=True):
+                        if not mesas_existentes:
+                            st.info("No hay mesas abiertas. Escribe una nueva:")
+                            sel_mesa = st.text_input("Nombre Mesa")
+                        else:
+                            sel_mesa = st.selectbox("Seleccionar Cuenta/Mesa", mesas_existentes)
+                            
+                        # Selección de prod
+                        prods_disp = [p for p, stk in stock_actual.items() if stk > 0]
+                        if not prods_disp:
+                            st.warning("No hay productos con stock disponibles aún.")
+                            sel_prod = ""
+                            cant = 0
+                            precio_ingresado = 0
+                        else:
+                            sel_prod = st.selectbox("Producto Disp.", [f"{p} (Stock: {stock_actual[p]:.0f})" for p in prods_disp])
+                            cant = st.number_input("Cantidad", min_value=1, step=1)
+                            st.caption("Escribe un precio diferente SÓLO si necesitas cobrar un monto especial. De lo contrario, deja 0 para usar el catálogo.")
+                            precio_ingresado = st.number_input("Precio Especial (CLP) - Opcional", min_value=0, step=100, value=0)
                         
-                    # Selección de prod
-                    prods_disp = [p for p, stk in stock_actual.items() if stk > 0]
-                    if not prods_disp:
-                        st.warning("No hay productos con stock disponibles aún.")
-                        sel_prod = ""
-                        cant = 0
-                        precio = 0
-                    else:
-                        sel_prod = st.selectbox("Producto Disp.", [f"{p} (Stock: {stock_actual[p]:.0f})" for p in prods_disp])
-                        prod_clean = sel_prod.split(" (Stock:")[0] if sel_prod else ""
-                        default_p = price_map.get(prod_clean, 0)
-                        
-                        cant = st.number_input("Cantidad", min_value=1, step=1)
-                        precio = st.number_input("Precio Unitario (CLP)", min_value=0, step=100, value=default_p)
-                    
-                    if st.button("Añadir a la Cuenta", type="primary", use_container_width=True):
-                            prod_clean = sel_prod.split(" (Stock:")[0] if sel_prod else ""
-                            if sel_mesa and prod_clean and cant > 0:
-                                # Validación Stock último minuto
-                                if stock_actual.get(prod_clean, 0) < cant:
-                                    st.error(f"⚠️ Stock insuficiente. Solo quedan {stock_actual.get(prod_clean, 0)}.")
-                                else:
-                                    now = pd.Timestamp.now(tz=STGO)
-                                    rec_venta = {
-                                        "ID": str(uuid.uuid4()),
-                                        "EventID": seleccion,
-                                        "Mesa": sel_mesa.strip(),
-                                        "Producto": prod_clean,
-                                        "Cantidad": str(int(cant)),
-                                        "Precio_Unitario": str(int(precio)),
-                                    "Total": str(int(cant * precio)),
+                        if st.form_submit_button("Añadir a la Cuenta", type="primary", use_container_width=True):
+                                prod_clean = sel_prod.split(" (Stock:")[0] if sel_prod else ""
+                                precio_final = precio_ingresado if precio_ingresado > 0 else price_map.get(prod_clean, 0)
+                                if sel_mesa and prod_clean and cant > 0:
+                                    # Validación Stock último minuto
+                                    if stock_actual.get(prod_clean, 0) < cant:
+                                        st.error(f"⚠️ Stock insuficiente. Solo quedan {stock_actual.get(prod_clean, 0)}.")
+                                    else:
+                                        now = pd.Timestamp.now(tz=STGO)
+                                        rec_venta = {
+                                            "ID": str(uuid.uuid4()),
+                                            "EventID": seleccion,
+                                            "Mesa": sel_mesa.strip(),
+                                            "Producto": prod_clean,
+                                            "Cantidad": str(int(cant)),
+                                            "Precio_Unitario": str(int(precio_final)),
+                                        "Total": str(int(cant * precio_final)),
                                         "Persona_Registro": usuario_actual,
                                         "Persona_Cobro": "",
                                         "Estado_Entrega": "Pendiente",
@@ -476,14 +477,16 @@ def render():
                                 
                                 st.markdown("---")
                                 
-                                medio_pago = st.selectbox("Medio de Pago", ["Transferencia", "Efectivo"], key=f"pago_{mesa}")
-                                quien_cobra = st.selectbox("¿Hacia quién fue la plata / depósito?", AUCCANES, index=AUCCANES.index(usuario_actual) if usuario_actual in AUCCANES else 0, key=f"cobro_{mesa}")
-                                
-                                todo_entregado = all(estado == "Entregado" for estado in det_mesa["Estado_Entrega"])
-                                if not todo_entregado:
-                                    st.warning("⚠️ Hay productos pendientes de entrega en esta cuenta. Debes entregar todo (pestaña 'Entregas') antes de poder confirmar el pago.")
-                                else:
-                                    if st.button(f"💸 Confirmar Pago {mesa}", key=f"btn_pago_{mesa}", type="primary"):
+                                with st.form(f"form_cobro_{mesa}"):
+                                    medio_pago = st.selectbox("Medio de Pago", ["Transferencia", "Efectivo"])
+                                    quien_cobra = st.selectbox("¿Hacia quién fue la plata / depósito?", AUCCANES, index=AUCCANES.index(usuario_actual) if usuario_actual in AUCCANES else 0)
+                                    
+                                    todo_entregado = all(estado == "Entregado" for estado in det_mesa["Estado_Entrega"])
+                                    if not todo_entregado:
+                                        st.warning("⚠️ Hay productos pendientes de entrega en esta cuenta. Debes entregar todo (pestaña 'Entregas') antes de poder confirmar el pago.")
+                                        st.form_submit_button("Confirmar Pago Bloqueado (Entregas Pendientes)", disabled=True)
+                                    else:
+                                        if st.form_submit_button(f"💸 Confirmar Pago {mesa}", type="primary"):
                                         # Hay que actualizar filas a Pagadas y registrar Quien Cobra
                                         import gspread
                                         ws = _open_ws("evt_ventas")

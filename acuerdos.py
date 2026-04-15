@@ -17,7 +17,16 @@ ECO_CSS = """
 @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
 
 :root {
-  color-scheme: only light;
+  color-scheme: only light !important;
+}
+
+/* Forzar modo light aunque el OS use dark mode */
+[data-testid="stAppViewContainer"],
+[data-testid="stHeader"],
+[data-testid="stSidebar"],
+.stApp {
+  filter: none !important;
+  color-scheme: light !important;
 }
 
 /* Tipografía global */
@@ -252,6 +261,23 @@ def _clean_name(name):
 
 auth_users_map = {_clean_name(u): u for u in AUCCANES}
 
+# -----------------------------------------------
+# Persistencia de sesión via query_params
+# Si el navegador/móvil recarga la página, se
+# restaura la sesión desde el parámetro URL 'u'.
+# -----------------------------------------------
+if st.session_state.current_user is None:
+    try:
+        saved_u = st.query_params.get("u", None)
+        if isinstance(saved_u, list):
+            saved_u = saved_u[0] if saved_u else None
+        if saved_u:
+            saved_clean = _clean_name(saved_u)
+            if saved_clean in auth_users_map:
+                st.session_state.current_user = auth_users_map[saved_clean]
+    except Exception:
+        pass
+
 with st.sidebar:
     logo_base64 = load_logo("images/logo_aucca.png")
     st.markdown(
@@ -274,6 +300,11 @@ with st.sidebar:
                 pass_clean = _clean_name(login_pass)
                 if user_clean and user_clean == pass_clean and user_clean in auth_users_map:
                     st.session_state.current_user = auth_users_map[user_clean]
+                    # Guardar en query_params para persistencia en móvil
+                    try:
+                        st.query_params["u"] = user_clean
+                    except Exception:
+                        pass
                     st.rerun()
                 else:
                     st.error("Credenciales incorrectas")
@@ -281,6 +312,10 @@ with st.sidebar:
         st.markdown(f"### 👤 {st.session_state.current_user}")
         if st.button("🚪 Cerrar Sesión", use_container_width=True):
             st.session_state.current_user = None
+            try:
+                st.query_params.clear()
+            except Exception:
+                pass
             st.rerun()
         
         st.markdown("---")

@@ -252,10 +252,10 @@ def render():
         tab_options = ["⚙️ Información General", "🛒 Punto de Venta (Caja)", "🍳 Gasto y Producción", "🏃 Entregas", "🧠 Aprendizajes", "🏁 Transacciones / Cierre"]
 
     # Si el tab activo no está en las opciones disponibles (ej: modo cambió de pro a simple),
-    # resetearlo a la primera opción para evitar estado inconsistente
+    # eliminarlo del estado para que st.radio use su valor por defecto (el primero).
     tab_key = f"tab_evt_{seleccion}"
-    if st.session_state.get(tab_key) not in tab_options:
-        st.session_state[tab_key] = tab_options[0]
+    if tab_key in st.session_state and st.session_state[tab_key] not in tab_options:
+        del st.session_state[tab_key]
 
     active_tab = st.radio("Sección del Evento", tab_options, horizontal=True,
                           label_visibility="collapsed", key=tab_key)
@@ -300,10 +300,11 @@ def render():
                     _actualizar_evento(seleccion, nuevo_nombre.strip(), nueva_desc.strip(),
                                        nuevo_tipo, nueva_fecha.strftime("%Y-%m-%d"), nuevo_modo)
                     # Actualizar session_state inmediatamente para que la UI refleje el nuevo modo
-                    # sin esperar que el caché del sheet expire
                     st.session_state[f"modo_evento_{seleccion}"] = nuevo_modo
-                    # Resetear tab activo por si el modo cambió (evita quedar en 'Entregas' en modo simple)
-                    st.session_state[f"tab_evt_{seleccion}"] = "⚙️ Información General"
+                    # Resetear tab activo usando 'del' para evitar StreamlitAPIException
+                    tab_key = f"tab_evt_{seleccion}"
+                    if tab_key in st.session_state:
+                        del st.session_state[tab_key]
                     st.success("✅ Configuración guardada correctamente.")
                     st.rerun()
 

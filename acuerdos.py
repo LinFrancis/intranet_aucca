@@ -29,30 +29,17 @@ ECO_CSS = """
   color-scheme: light !important;
 }
 
-/* Tipografía global — EXCLUIR elementos de Material Symbols para no romper íconos */
-html, body, .main, .stMarkdown, p, label, li {
-  font-family: 'Montserrat', sans-serif !important;
+/* Tipografía global: Aplicamos a contenedores de texto, EVITANDO `!important` en todo para no romper fuentes de íconos nativos */
+.stApp, .main, .stMarkdown, p, label, li, h1, h2, h3, h4, h5, h6, input, textarea {
+  font-family: 'Montserrat', sans-serif;
 }
-div:not([class*="material"]),
-span:not([class*="material"]):not([class*="Material"]) {
+
+/* Si Streamlit tiene algún elemento de texto que insiste, lo forzamos solo a etiquetas explicitas */
+p, h1, h2, h3, h4, h5, h6, li {
   font-family: 'Montserrat', sans-serif !important;
 }
 
-/* Restaurar fuente de íconos de Material Symbols (sidebar, expanders, botones) */
-[class*="material-symbols"],
-[class*="material-icons"],
-.material-symbols-rounded,
-.material-icons-rounded {
-  font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
-  font-size: 20px !important;
-  line-height: 1 !important;
-}
-
-/* Asegurar que las flechas de expanders sean visibles */
-[data-testid="stExpanderToggleIcon"] {
-  display: flex !important;
-  opacity: 1 !important;
-}
+/* IMPORTANTE: No aplicar font-family a span o div vacíos directos con !important, ya que Streamlit oculta íconos ahí (ej: double_arrow_right) */
 /* Fondos */
 [data-testid="stAppViewContainer"] > .main {
   background-color: #F3ECFF !important;

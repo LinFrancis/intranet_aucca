@@ -34,16 +34,11 @@ html, body, .main, .stMarkdown, p, div, span, label, li {
   font-family: 'Montserrat', sans-serif !important;
 }
 
-/* Safety net: ocultar CUALQUIER texto de Material Icons que Streamlit renderice como fallback */
-[data-testid="stIconMaterial"],
-[data-testid="stExpanderToggleIcon"],
-[data-testid="stExpander"] summary [class*="icon"],
-[data-testid="stExpander"] summary [class*="Icon"] {
-  font-size: 0 !important;
-  overflow: hidden !important;
-  width: 0 !important;
-  height: 0 !important;
-  display: none !important;
+/* Asegurar que las flechas de los expanders y sidebar sean visibles */
+[data-testid="stExpanderToggleIcon"] {
+  display: flex !important;
+  opacity: 1 !important;
+  color: #7B4F9E !important;
 }
 
 

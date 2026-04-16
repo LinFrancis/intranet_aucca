@@ -29,20 +29,30 @@ ECO_CSS = """
   color-scheme: light !important;
 }
 
-/* Tipografía global */
-html, body, .main, .stMarkdown, p, div, span, label, li {
+/* Tipografía global — EXCLUIR elementos de Material Symbols para no romper íconos */
+html, body, .main, .stMarkdown, p, label, li {
+  font-family: 'Montserrat', sans-serif !important;
+}
+div:not([class*="material"]),
+span:not([class*="material"]):not([class*="Material"]) {
   font-family: 'Montserrat', sans-serif !important;
 }
 
-/* Asegurar que las flechas de los expanders y sidebar sean visibles */
+/* Restaurar fuente de íconos de Material Symbols (sidebar, expanders, botones) */
+[class*="material-symbols"],
+[class*="material-icons"],
+.material-symbols-rounded,
+.material-icons-rounded {
+  font-family: 'Material Symbols Rounded', 'Material Icons', sans-serif !important;
+  font-size: 20px !important;
+  line-height: 1 !important;
+}
+
+/* Asegurar que las flechas de expanders sean visibles */
 [data-testid="stExpanderToggleIcon"] {
   display: flex !important;
   opacity: 1 !important;
-  color: #7B4F9E !important;
 }
-
-
-
 /* Fondos */
 [data-testid="stAppViewContainer"] > .main {
   background-color: #F3ECFF !important;

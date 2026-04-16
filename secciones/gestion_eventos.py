@@ -166,7 +166,14 @@ def render():
 
     evento_sel_data = df_eventos[df_eventos["ID"] == seleccion].iloc[0]
     es_cerrado      = evento_sel_data["Estado"] == "Cerrado"
-    modo_evento     = str(evento_sel_data.get("Modo", "pro")).strip().lower()
+
+    # modo_evento: leer desde session_state (se actualiza inmediatamente al guardar)
+    # con el valor del sheet como referencia inicial.
+    modo_sheet = str(evento_sel_data.get("Modo", "")).strip().lower()
+    if modo_sheet not in ("simple", "pro"):
+        modo_sheet = "pro"  # default si la columna no existe aún o está vacía
+    # session_state tiene prioridad si el usuario acaba de cambiar el modo en esta sesión
+    modo_evento = st.session_state.get(f"modo_evento_{seleccion}", modo_sheet)
     if modo_evento not in ("simple", "pro"):
         modo_evento = "pro"
 
@@ -175,18 +182,47 @@ def render():
 
     st.markdown("---")
 
-    # Cargar datos del evento
+    # Cargar datos del evento — usar .copy() para evitar SettingWithCopyWarning
     df_inv  = _load_evt_df("evt_inventario")
     df_ven  = _load_evt_df("evt_ventas")
     df_prod = _load_evt_df("evt_productos")
 
-    _anulado = lambda df: df.get("Anulado", pd.Series([""] * len(df))) != "TRUE"
+    # Filtrar y crear copias independientes (CRÍTICO: sin .copy() las asignaciones de columnas fallan)
+    def _safe_filter(df, cond_cols: dict, schema_key: str) -> pd.DataFrame:
+        """Filtra un df por condiciones, retorna copia segura o DataFrame vacío."""
+        if df.empty:
+            return pd.DataFrame(columns=SHEETS_CONFIG[schema_key])
+        mask = pd.Series(True, index=df.index)
+        for col, val in cond_cols.items():
+            if col in df.columns:
+                mask &= (df[col] == val)
+        return df[mask].copy()
 
-    df_inv_act  = df_inv[(df_inv["EventID"] == seleccion) & (df_inv["Anulado"] != "TRUE")]  if not df_inv.empty  else pd.DataFrame(columns=SHEETS_CONFIG["evt_inventario"])
-    df_ven_act  = df_ven[(df_ven["EventID"] == seleccion) & (df_ven["Anulado"] != "TRUE")]  if not df_ven.empty  else pd.DataFrame(columns=SHEETS_CONFIG["evt_ventas"])
-    df_prod_act = df_prod[(df_prod["EventID"] == seleccion) & (df_prod["Anulado"] != "TRUE")] if not df_prod.empty else pd.DataFrame(columns=SHEETS_CONFIG["evt_productos"])
+    df_inv_act  = _safe_filter(df_inv,  {"EventID": seleccion, "Anulado": ""}, "evt_inventario")
+    # Para Anulado: excluir filas marcadas TRUE (puede ser "", "False", None — solo excluir "TRUE")
+    if not df_inv.empty:
+        mask_inv = (df_inv["EventID"] == seleccion) & (df_inv["Anulado"].astype(str).str.upper() != "TRUE")
+        df_inv_act = df_inv[mask_inv].copy()
+    else:
+        df_inv_act = pd.DataFrame(columns=SHEETS_CONFIG["evt_inventario"])
 
-    # Mapa de precios (siempre desde evt_productos — fuente de verdad)
+    if not df_ven.empty:
+        mask_ven = (df_ven["EventID"] == seleccion) & (df_ven["Anulado"].astype(str).str.upper() != "TRUE")
+        df_ven_act = df_ven[mask_ven].copy()
+    else:
+        df_ven_act = pd.DataFrame(columns=SHEETS_CONFIG["evt_ventas"])
+
+    if not df_prod.empty:
+        mask_prod = (df_prod["EventID"] == seleccion) & (df_prod["Anulado"].astype(str).str.upper() != "TRUE")
+        df_prod_act = df_prod[mask_prod].copy()
+    else:
+        df_prod_act = pd.DataFrame(columns=SHEETS_CONFIG["evt_productos"])
+
+    # Pre-calcular columnas numéricas UNA SOLA VEZ (evita asignaciones en slices)
+    df_ven_act["Total_Num"] = pd.to_numeric(df_ven_act.get("Total", pd.Series(dtype=float)), errors="coerce").fillna(0)
+    df_inv_act["Gasto_Num"] = pd.to_numeric(df_inv_act.get("Gasto_Materiales", pd.Series(dtype=float)), errors="coerce").fillna(0)
+
+    # Mapa de precios (desde evt_productos — fuente de verdad)
     price_map = {}
     if not df_prod_act.empty:
         for _, r in df_prod_act.iterrows():
@@ -209,14 +245,20 @@ def render():
 
     stock_actual = _calcular_stock()
 
-    # Tabs
+    # Tabs — construir según modo. Forzar reset si el modo cambió
     if modo_evento == "simple":
         tab_options = ["⚙️ Información General", "🛒 Punto de Venta (Caja)", "🍳 Gasto y Producción", "🧠 Aprendizajes", "🏁 Transacciones / Cierre"]
     else:
         tab_options = ["⚙️ Información General", "🛒 Punto de Venta (Caja)", "🍳 Gasto y Producción", "🏃 Entregas", "🧠 Aprendizajes", "🏁 Transacciones / Cierre"]
 
+    # Si el tab activo no está en las opciones disponibles (ej: modo cambió de pro a simple),
+    # resetearlo a la primera opción para evitar estado inconsistente
+    tab_key = f"tab_evt_{seleccion}"
+    if st.session_state.get(tab_key) not in tab_options:
+        st.session_state[tab_key] = tab_options[0]
+
     active_tab = st.radio("Sección del Evento", tab_options, horizontal=True,
-                          label_visibility="collapsed", key=f"tab_evt_{seleccion}")
+                          label_visibility="collapsed", key=tab_key)
 
     # ==========================================
     # TAB 0: Información General
@@ -257,6 +299,11 @@ def render():
                 if st.form_submit_button("💾 Guardar Configuración", type="primary", use_container_width=True):
                     _actualizar_evento(seleccion, nuevo_nombre.strip(), nueva_desc.strip(),
                                        nuevo_tipo, nueva_fecha.strftime("%Y-%m-%d"), nuevo_modo)
+                    # Actualizar session_state inmediatamente para que la UI refleje el nuevo modo
+                    # sin esperar que el caché del sheet expire
+                    st.session_state[f"modo_evento_{seleccion}"] = nuevo_modo
+                    # Resetear tab activo por si el modo cambió (evita quedar en 'Entregas' en modo simple)
+                    st.session_state[f"tab_evt_{seleccion}"] = "⚙️ Información General"
                     st.success("✅ Configuración guardada correctamente.")
                     st.rerun()
 
@@ -652,16 +699,18 @@ def render():
                     st.rerun()
             return
 
-        df_ven_act["Total_Num"] = pd.to_numeric(df_ven_act["Total"], errors="coerce").fillna(0)
-        df_inv_act["Gasto_Num"] = pd.to_numeric(df_inv_act["Gasto_Materiales"], errors="coerce").fillna(0)
+        # Total_Num y Gasto_Num ya están pre-calculados en la sección de carga de datos
+        # (se calculan una sola vez en copias independientes para evitar SettingWithCopyWarning)
 
-        df_pagadas    = df_ven_act[df_ven_act["Estado_Pago"] == "Pagado"].copy()
-        df_no_pagadas = df_ven_act[df_ven_act["Estado_Pago"] == "Pendiente"]
+        # Filtrar pagadas — comparación case-insensitive para capturar variantes ("Pagado", "pagado", etc.)
+        estado_pago_norm = df_ven_act["Estado_Pago"].astype(str).str.strip().str.lower()
+        df_pagadas    = df_ven_act[estado_pago_norm == "pagado"].copy()
+        df_no_pagadas = df_ven_act[estado_pago_norm == "pendiente"]
         total_deudas  = df_no_pagadas["Total_Num"].sum()
         total_ventas  = df_ven_act["Total_Num"].sum()
 
         if not df_pagadas.empty:
-            df_pagadas["Persona_Cobro"] = df_pagadas["Persona_Cobro"].replace("", "Sin asignar").fillna("Sin asignar")
+            df_pagadas["Persona_Cobro"] = df_pagadas["Persona_Cobro"].astype(str).replace("", "Sin asignar").fillna("Sin asignar")
             pagos_por_persona = df_pagadas.groupby("Persona_Cobro")["Total_Num"].sum().to_dict()
         else:
             pagos_por_persona = {}
@@ -669,12 +718,13 @@ def render():
 
         df_gastos_reales = df_inv_act[df_inv_act["Gasto_Num"] > 0].copy()
         if not df_gastos_reales.empty:
-            df_gastos_reales["Persona_Gasto"] = df_gastos_reales["Persona_Gasto"].replace("", "Sin asignar").fillna("Sin asignar")
+            df_gastos_reales["Persona_Gasto"] = df_gastos_reales["Persona_Gasto"].astype(str).replace("", "Sin asignar").fillna("Sin asignar")
             gastos_por_persona = df_gastos_reales.groupby("Persona_Gasto")["Gasto_Num"].sum().to_dict()
         else:
             gastos_por_persona = {}
         total_gastado = sum(gastos_por_persona.values())
         utilidad_neta = total_recaudado - total_gastado
+
 
         col1, col2, col3 = st.columns(3)
         col1.metric("Total Ventas Registradas",       f"${int(total_ventas):,}".replace(",", "."))

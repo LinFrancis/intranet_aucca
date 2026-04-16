@@ -33,20 +33,29 @@ def _get_sheet_client():
     )
     return gspread.authorize(creds)
 
+@st.cache_resource(ttl=600)
+def _get_spreadsheet():
+    """Mantiene en caché (10 mins) el objeto Spreadsheet para no descargar la metadata de todo el libro
+    en cada operación de lectura/escritura (ahorra decenas de hits a la API)."""
+    client = _get_sheet_client()
+    return client.open_by_key(SPREADSHEET_KEY)
+
 def _open_ws_evt(sheet_name: str):
-    """Abre worksheet con reconexión automática. Reintenta 2 veces si falla."""
+    """Abre worksheet con reconexión automática. Si falla, limpia caché de auth y reintenta."""
     for intento in range(3):
         try:
-            client = _get_sheet_client()
-            sh = client.open_by_key(SPREADSHEET_KEY)
+            sh = _get_spreadsheet()
             return sh.worksheet(sheet_name)
         except Exception as e:
             if intento == 2:
                 raise e
+            # Limpiar caché para forzar nueva autenticación y nuevo metadata fetch
+            _get_spreadsheet.clear()
 
-def _get_real_headers(sheet_name: str) -> list[str]:
-    """Obtiene los headers REALES del sheet (no los de SHEETS_CONFIG) y agrega los faltantes."""
-    ws = _open_ws_evt(sheet_name)
+def _get_real_headers(sheet_name: str, ws=None) -> list[str]:
+    """Obtiene los headers REALES del sheet. Si recibe ws, ahorra una llamada API."""
+    if ws is None:
+        ws = _open_ws_evt(sheet_name)
     headers_raw = ws.row_values(1)
     headers = [h.strip() for h in headers_raw]
     expected = SHEETS_CONFIG.get(sheet_name, [])
@@ -66,17 +75,31 @@ def _col_idx(headers: list[str], col_name: str) -> int:
 # ==========================================
 @st.cache_data(ttl=30)
 def _load_evt_df(sheet_name: str) -> pd.DataFrame:
-    """Carga los datos de una hoja como dataframe. Reconecta si hay error."""
+    """Carga los datos de una hoja como dataframe. Reconecta si hay error. 
+    (Optimizado para reducir hits al API)"""
     try:
         ws      = _open_ws_evt(sheet_name)
-        headers = _get_real_headers(sheet_name)
-        values  = ws.get_all_values()
+        values  = ws.get_all_values()  # 1 SOLO llamado a la API
     except Exception as e:
         st.warning(f"⚠️ Error al leer '{sheet_name}': {e}. Usa el botón 🔄 para reconectar.")
         return pd.DataFrame(columns=SHEETS_CONFIG.get(sheet_name, []))
 
     if not values:
+        # Sheet vacía, asegurar que tenga headers
+        headers = _get_real_headers(sheet_name, ws)
         return pd.DataFrame(columns=headers)
+
+    headers_raw = values[0]
+    headers = [h.strip() for h in headers_raw]
+    
+    # Revisión de headers rápida offline
+    expected = SHEETS_CONFIG.get(sheet_name, [])
+    missing = [h for h in expected if h not in headers]
+    if missing:
+        # Solo actualiza si faltan (1 hit)
+        headers = headers + missing
+        ws.update(_a1_range_row(1, len(headers)), [headers])
+
     rows = values[1:]
     norm_rows = [r[:len(headers)] + [""] * max(0, len(headers) - len(r)) for r in rows]
     df = pd.DataFrame(norm_rows, columns=headers)
@@ -108,6 +131,7 @@ def render():
     with col_btn:
         if st.button("🔄 Reconectar BD", help="Fuerza reconexión y limpia el caché si la app quedó sin datos", use_container_width=True):
             _load_evt_df.clear()
+            _get_spreadsheet.clear()
             st.cache_data.clear()
             st.success("Caché limpiado. Recargando...")
             st.rerun()

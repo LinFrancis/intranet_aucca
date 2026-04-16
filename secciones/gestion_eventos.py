@@ -379,38 +379,7 @@ def render():
             else:
                 st.info("No hay productos registrados aún.")
 
-        # Editar Stock disponible
-        st.markdown("---")
-        st.markdown("#### 📦 Editar Stock Disponible (Inventario)")
-        st.caption("Puedes corregir cantidades de producción ya registradas sin anularlas.")
-        if not df_inv_act.empty:
-            df_inv_stock = df_inv_act[df_inv_act["Cantidad"].apply(
-                lambda x: pd.to_numeric(x, errors="coerce") > 0 if pd.to_numeric(x, errors="coerce") is not None else False
-            )].copy() if not df_inv_act.empty else pd.DataFrame()
-            # Filtrar los que tienen cantidad > 0 (producción real, no gastos)
-            df_inv_stock = df_inv_act[pd.to_numeric(df_inv_act["Cantidad"], errors="coerce").fillna(0) > 0].copy()
-            if not df_inv_stock.empty:
-                df_stock_edit = df_inv_stock[["ID", "Producto", "Cantidad", "Persona_Registro", "CreatedAt"]].copy()
-                df_stock_edit["Cantidad"] = pd.to_numeric(df_stock_edit["Cantidad"], errors="coerce").fillna(0).astype(int)
-                with st.form("form_edit_stock"):
-                    edited_stock = st.data_editor(
-                        df_stock_edit,
-                        column_config={
-                            "ID":               None,
-                            "Producto":         st.column_config.TextColumn("Producto", disabled=True),
-                            "Cantidad":         st.column_config.NumberColumn("Cantidad", min_value=0, step=1),
-                            "Persona_Registro": st.column_config.TextColumn("Registrado por", disabled=True),
-                            "CreatedAt":        st.column_config.TextColumn("Fecha", disabled=True),
-                        },
-                        hide_index=True, use_container_width=True
-                    )
-                    if st.form_submit_button("💾 Guardar Cambios de Stock", type="primary", use_container_width=True):
-                        _actualizar_stock(df_stock_edit, edited_stock)
-                        st.rerun()
-            else:
-                st.info("No hay entradas de producción para editar.")
-        else:
-            st.info("No hay inventario registrado aún.")
+
 
     # ==========================================
     # TAB 1: Punto de Venta
@@ -632,6 +601,36 @@ def render():
             df_inv_view["Gasto_Materiales"] = pd.to_numeric(df_inv_view["Gasto_Materiales"], errors="coerce").fillna(0)
             st.dataframe(df_inv_view, use_container_width=True, hide_index=True)
 
+        # Editar Stock disponible (Movido de Tab 0 a Tab 2)
+        st.markdown("---")
+        st.markdown("#### 📦 Editar Stock Disponible (Inventario)")
+        st.caption("¿Anotaste mal una cantidad producida? Puedes corregirla aquí abajo:")
+        if not df_inv_act.empty:
+            # Filtrar los que tienen cantidad > 0 (producción real, no gastos)
+            df_inv_stock = df_inv_act[pd.to_numeric(df_inv_act["Cantidad"], errors="coerce").fillna(0) > 0].copy()
+            if not df_inv_stock.empty:
+                df_stock_edit = df_inv_stock[["ID", "Producto", "Cantidad", "Persona_Registro", "CreatedAt"]].copy()
+                df_stock_edit["Cantidad"] = pd.to_numeric(df_stock_edit["Cantidad"], errors="coerce").fillna(0).astype(int)
+                with st.form("form_edit_stock"):
+                    edited_stock = st.data_editor(
+                        df_stock_edit,
+                        column_config={
+                            "ID":               None,
+                            "Producto":         st.column_config.TextColumn("Producto", disabled=True),
+                            "Cantidad":         st.column_config.NumberColumn("Cantidad", min_value=0, step=1),
+                            "Persona_Registro": st.column_config.TextColumn("Registrado por", disabled=True),
+                            "CreatedAt":        st.column_config.TextColumn("Fecha", disabled=True),
+                        },
+                        hide_index=True, use_container_width=True
+                    )
+                    if st.form_submit_button("💾 Guardar Cambios de Stock", type="primary", use_container_width=True):
+                        _actualizar_stock(df_stock_edit, edited_stock)
+                        st.rerun()
+            else:
+                st.info("No hay entradas de producción para editar.")
+        else:
+            st.info("No hay inventario registrado aún.")
+
     # ==========================================
     # TAB 3: Entregas (solo Modo Pro)
     # ==========================================
@@ -702,10 +701,11 @@ def render():
         # Total_Num y Gasto_Num ya están pre-calculados en la sección de carga de datos
         # (se calculan una sola vez en copias independientes para evitar SettingWithCopyWarning)
 
-        # Filtrar pagadas — comparación case-insensitive para capturar variantes ("Pagado", "pagado", etc.)
+        # Filtrar pagadas — asumiremos que cualquier cosa que NO sea "pendiente" ni esté vacía, es plata que entró / se confirmó
         estado_pago_norm = df_ven_act["Estado_Pago"].astype(str).str.strip().str.lower()
-        df_pagadas    = df_ven_act[estado_pago_norm == "pagado"].copy()
-        df_no_pagadas = df_ven_act[estado_pago_norm == "pendiente"]
+        es_pendiente     = estado_pago_norm.isin(["pendiente", ""])
+        df_pagadas       = df_ven_act[~es_pendiente].copy()
+        df_no_pagadas    = df_ven_act[es_pendiente]
         total_deudas  = df_no_pagadas["Total_Num"].sum()
         total_ventas  = df_ven_act["Total_Num"].sum()
 
@@ -811,10 +811,23 @@ def render():
 
 # ==========================================
 # Funciones de escritura en Google Sheets
-# Todas usan _get_real_headers() para obtener
-# índices de columna desde el sheet real,
-# no desde SHEETS_CONFIG hardcodeado.
 # ==========================================
+
+def _get_records_with_row(ws, hdrs):
+    """
+    Retorna un iterador de tuplas (row_excel_index, dict_record) 
+    usando get_all_values() en lugar de get_all_records(). 
+    Evita el salto de filas vacías que rompe el mapeo i+2.
+    """
+    values = ws.get_all_values()
+    res = []
+    if len(values) < 2:
+        return res
+    for i, row_arr in enumerate(values[1:]):
+        row_excel = i + 2
+        rec = {hdrs[j]: (row_arr[j] if j < len(row_arr) else "") for j in range(len(hdrs))}
+        res.append((row_excel, rec))
+    return res
 
 def _actualizar_evento(event_id, nombre, desc, tipo, fecha, modo):
     """Actualiza la configuración de un evento usando headers reales del sheet."""
@@ -829,9 +842,8 @@ def _actualizar_evento(event_id, nombre, desc, tipo, fecha, modo):
         hdrs.append("Modo")
         ws.update_cell(1, col_new, "Modo")
 
-    for i, r in enumerate(records):
+    for row_excel, r in _get_records_with_row(ws, hdrs):
         if str(r.get("ID")) == event_id:
-            row_excel = i + 2
             updates   = []
             for field, val in [("Nombre", nombre), ("Detalles_Ficha", desc),
                                 ("Tipo", tipo), ("Fecha", fecha), ("Modo", modo)]:
@@ -855,10 +867,7 @@ def _actualizar_productos(event_id, orig_names, edited_df):
     """
     ws_prod    = _open_ws_evt("evt_productos")
     hdrs_prod  = ws_prod.row_values(1)
-    records    = ws_prod.get_all_records()
-    updates    = []
-    renames    = {}  # {old_name: new_name}
-
+    
     # Índices reales
     def _idx(hdrs, col):
         return hdrs.index(col) + 1 if col in hdrs else None
@@ -872,10 +881,12 @@ def _actualizar_productos(event_id, orig_names, edited_df):
     if idx_desc is None:
         new_col = len(hdrs_prod) + 1
         ws_prod.update_cell(1, new_col, "Descripcion")
-        hdrs_prod.append("Descripcion")
-        idx_desc = new_col
+    idx_desc = _idx(hdrs_prod, "Descripcion")
+    
+    updates    = []
+    renames    = {}
 
-    rows_by_name = {str(r.get("Nombre")): (i + 2, r) for i, r in enumerate(records)
+    rows_by_name = {str(r.get("Nombre")): (row_excel, r) for row_excel, r in _get_records_with_row(ws_prod, hdrs_prod)
                     if str(r.get("EventID")) == event_id}
 
     for orig_name, new_row in zip(orig_names, edited_df.itertuples(index=False)):
@@ -917,17 +928,16 @@ def _cascadear_renombre(event_id, renames: dict):
         try:
             ws      = _open_ws_evt(sheet_name)
             hdrs    = ws.row_values(1)
-            records = ws.get_all_records()
             updates = []
             col_prod = hdrs.index("Producto") + 1 if "Producto" in hdrs else None
             if col_prod is None:
                 continue
-            for i, r in enumerate(records):
+            for row_excel, r in _get_records_with_row(ws, hdrs):
                 if str(r.get("EventID")) != event_id:
                     continue
                 prod_actual = str(r.get("Producto", ""))
                 if prod_actual in renames:
-                    updates.append(gspread.Cell(row=i + 2, col=col_prod, value=renames[prod_actual]))
+                    updates.append(gspread.Cell(row=row_excel, col=col_prod, value=renames[prod_actual]))
             if updates:
                 ws.update_cells(updates)
         except Exception as e:
@@ -937,13 +947,12 @@ def _actualizar_stock(df_orig, df_edited):
     """Actualiza cantidades en evt_inventario según cambios editados."""
     ws      = _open_ws_evt("evt_inventario")
     hdrs    = ws.row_values(1)
-    records = ws.get_all_records()
     col_cant = hdrs.index("Cantidad") + 1 if "Cantidad" in hdrs else None
     if col_cant is None:
         st.error("No se encontró la columna Cantidad.")
         return
     updates = []
-    id_to_row = {str(r.get("ID")): i + 2 for i, r in enumerate(records)}
+    id_to_row = {str(r.get("ID")): row_excel for row_excel, r in _get_records_with_row(ws, hdrs)}
     for orig_row, new_row in zip(df_orig.itertuples(index=False), df_edited.itertuples(index=False)):
         if str(orig_row.Cantidad) != str(new_row.Cantidad):
             row_excel = id_to_row.get(str(orig_row.ID))
@@ -960,12 +969,11 @@ def _actualizar_ventas_mesa(edited_df):
     """Guarda cambios en cantidades/eliminar de una mesa."""
     ws      = _open_ws_evt("evt_ventas")
     hdrs    = ws.row_values(1)
-    records = ws.get_all_records()
     idx_cant = hdrs.index("Cantidad") + 1 if "Cantidad" in hdrs else None
     idx_tot  = hdrs.index("Total") + 1    if "Total"    in hdrs else None
     idx_anu  = hdrs.index("Anulado") + 1  if "Anulado"  in hdrs else None
     updates  = []
-    id_to_row = {str(r.get("ID")): (i + 2, r) for i, r in enumerate(records)}
+    id_to_row = {str(r.get("ID")): (row_excel, r) for row_excel, r in _get_records_with_row(ws, hdrs)}
 
     for _, changed in edited_df.iterrows():
         c_id  = str(changed["ID"])
@@ -994,17 +1002,16 @@ def _actualizar_ventas_mesa(edited_df):
 def _confirmar_pago_mesa(event_id, mesa, medio_pago, quien_cobra, modo_evento):
     ws      = _open_ws_evt("evt_ventas")
     hdrs    = ws.row_values(1)
-    records = ws.get_all_records()
     idx_ep  = hdrs.index("Estado_Pago") + 1   if "Estado_Pago"   in hdrs else None
     idx_mp  = hdrs.index("Medio_Pago") + 1    if "Medio_Pago"    in hdrs else None
     idx_pc  = hdrs.index("Persona_Cobro") + 1 if "Persona_Cobro" in hdrs else None
     idx_ee  = hdrs.index("Estado_Entrega") + 1 if "Estado_Entrega" in hdrs else None
     updates = []
-    for i, r in enumerate(records):
+    
+    for row_excel, r in _get_records_with_row(ws, hdrs):
         if (str(r.get("EventID")) == event_id and
                 str(r.get("Mesa")) == mesa and
-                str(r.get("Estado_Pago")) == "Pendiente"):
-            row_excel = i + 2
+                str(r.get("Estado_Pago")).lower() in ["pendiente", ""]):
             if idx_ep: updates.append(gspread.Cell(row=row_excel, col=idx_ep, value="Pagado"))
             if idx_mp: updates.append(gspread.Cell(row=row_excel, col=idx_mp, value=medio_pago))
             if idx_pc: updates.append(gspread.Cell(row=row_excel, col=idx_pc, value=quien_cobra))
@@ -1018,25 +1025,23 @@ def _confirmar_pago_mesa(event_id, mesa, medio_pago, quien_cobra, modo_evento):
 def _marcar_entregado(venta_id: str):
     ws      = _open_ws_evt("evt_ventas")
     hdrs    = ws.row_values(1)
-    records = ws.get_all_records()
     col_ee  = hdrs.index("Estado_Entrega") + 1 if "Estado_Entrega" in hdrs else None
     if not col_ee:
         return
-    for i, r in enumerate(records):
+    for row_excel, r in _get_records_with_row(ws, hdrs):
         if str(r.get("ID")) == venta_id:
-            ws.update_cell(i + 2, col_ee, "Entregado")
+            ws.update_cell(row_excel, col_ee, "Entregado")
             _load_evt_df.clear()
             return
 
 def _marcar_borrado(event_id):
     ws      = _open_ws_evt("evt_eventos")
     hdrs    = ws.row_values(1)
-    records = ws.get_all_records()
     col_e   = hdrs.index("Estado") + 1 if "Estado" in hdrs else None
     if not col_e: return
-    for i, r in enumerate(records):
+    for row_excel, r in _get_records_with_row(ws, hdrs):
         if str(r.get("ID")) == event_id:
-            ws.update_cell(i + 2, col_e, "Borrado")
+            ws.update_cell(row_excel, col_e, "Borrado")
             _load_evt_df.clear()
             return
 
@@ -1044,9 +1049,10 @@ def _anular_evento_y_finanzas(event_id, event_name):
     ws_evt = _open_ws_evt("evt_eventos")
     hdrs   = ws_evt.row_values(1)
     col_e  = hdrs.index("Estado") + 1 if "Estado" in hdrs else None
-    for i, r in enumerate(ws_evt.get_all_records()):
+    
+    for row_excel, r in _get_records_with_row(ws_evt, hdrs):
         if str(r.get("ID")) == event_id and col_e:
-            ws_evt.update_cell(i + 2, col_e, "Anulado")
+            ws_evt.update_cell(row_excel, col_e, "Anulado")
             _load_evt_df.clear()
             break
     try:
@@ -1055,10 +1061,17 @@ def _anular_evento_y_finanzas(event_id, event_name):
         if "Anulado" in headers_fin:
             idx_anu = headers_fin.index("Anulado") + 1
             updates = []
-            for i, r in enumerate(ws_fin.get_all_records()):
-                det = str(r.get("Detalle", ""))
-                if event_name in det and any(det.startswith(p) for p in ["Ventas en", "Insumo en", "Liquidación x"]):
-                    updates.append(gspread.Cell(row=i + 2, col=idx_anu, value="TRUE"))
+            
+            # Replicar lógica de "get_records_with_row" para finanzas que tiene la misma vulnerabilidad
+            values = ws_fin.get_all_values()
+            if len(values) >= 2:
+                for idx_arr, row_arr in enumerate(values[1:]):
+                    row_excel = idx_arr + 2
+                    rec = {headers_fin[j]: (row_arr[j] if j < len(row_arr) else "") for j in range(len(headers_fin))}
+                    det = str(rec.get("Detalle", ""))
+                    if event_name in det and any(det.startswith(p) for p in ["Ventas en", "Insumo en", "Liquidación x"]):
+                        updates.append(gspread.Cell(row=row_excel, col=idx_anu, value="TRUE"))
+
             if updates:
                 ws_fin.update_cells(updates)
     except Exception as e:
@@ -1067,10 +1080,8 @@ def _anular_evento_y_finanzas(event_id, event_name):
 def _marcar_cerrado(event_id, a, m, t, n=0):
     ws      = _open_ws_evt("evt_eventos")
     hdrs    = ws.row_values(1)
-    records = ws.get_all_records()
-    for i, r in enumerate(records):
+    for row_excel, r in _get_records_with_row(ws, hdrs):
         if str(r.get("ID")) == event_id:
-            row_excel = i + 2
             now_str   = pd.Timestamp.now(tz=STGO).strftime("%Y-%m-%d %H:%M:%S")
             updates   = []
             for field, val in [("Estado", "Cerrado"), ("Asistentes", a), ("Mujeres_Pct", m),
